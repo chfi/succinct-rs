@@ -1,4 +1,4 @@
-use num_traits::{One, Zero, ToPrimitive};
+use num_traits::{One, ToPrimitive, Zero};
 
 use storage::{Address, BlockType};
 
@@ -16,6 +16,7 @@ pub trait BitVec {
     fn bit_len(&self) -> u64;
 
     /// The length of the slice in blocks.
+    #[inline]
     fn block_len(&self) -> usize {
         self.bit_len().ceil_div(Self::Block::nbits() as u64) as usize
     }
@@ -28,6 +29,7 @@ pub trait BitVec {
     /// # Panics
     ///
     /// Panics if `position` is out of bounds.
+    #[inline]
     fn get_bit(&self, position: u64) -> bool {
         assert!(position < self.bit_len(), "BitVec::get_bit: out of bounds");
 
@@ -49,16 +51,19 @@ pub trait BitVec {
     /// # Panics
     ///
     /// Panics if `position` is out of bounds.
+    #[inline]
     fn get_block(&self, position: usize) -> Self::Block {
-        assert!(position < self.block_len(),
-                "IntSlice::get_block: out of bounds");
+        assert!(
+            position < self.block_len(),
+            "IntSlice::get_block: out of bounds"
+        );
 
         let bit_position = position as u64 * Self::Block::nbits() as u64;
 
         let mut result = Self::Block::zero();
         let mut mask = Self::Block::one();
 
-        for i in 0 .. Self::Block::nbits() as u64 {
+        for i in 0..Self::Block::nbits() as u64 {
             if bit_position + i < self.bit_len() && self.get_bit(bit_position + i) {
                 result = result | mask;
             }
@@ -74,6 +79,7 @@ pub trait BitVec {
     /// # Panics
     ///
     /// Panics if the bit span goes out of bounds.
+    #[inline]
     fn get_bits(&self, start: u64, count: usize) -> Self::Block {
         let limit = start + count as u64;
         assert!(limit <= self.bit_len(), "BitVec::get_bits: out of bounds");
@@ -83,7 +89,7 @@ pub trait BitVec {
 
         if margin >= count {
             let block = self.get_block(address.block_index);
-            return block.get_bits(address.bit_offset, count)
+            return block.get_bits(address.bit_offset, count);
         }
 
         let extra = count - margin;
@@ -112,8 +118,12 @@ pub trait BitVecMut: BitVec {
     /// # Panics
     ///
     /// Panics if `position` is out of bounds.
+    #[inline]
     fn set_bit(&mut self, position: u64, value: bool) {
-        assert!(position < self.bit_len(), "BitVecMut::set_bit: out of bounds");
+        assert!(
+            position < self.bit_len(),
+            "BitVecMut::set_bit: out of bounds"
+        );
 
         let address = Address::new::<Self::Block>(position);
         let old_block = self.get_block(address.block_index);
@@ -135,6 +145,7 @@ pub trait BitVecMut: BitVec {
     /// # Panics
     ///
     /// Panics if `position` is out of bounds.
+    #[inline]
     fn set_block(&mut self, position: usize, mut value: Self::Block) {
         let limit = if position + 1 == self.block_len() {
             Self::Block::last_block_bits(self.bit_len())
@@ -143,7 +154,7 @@ pub trait BitVecMut: BitVec {
         };
 
         let start = Self::Block::mul_nbits(position);
-        for i in 0 .. limit as u64 {
+        for i in 0..limit as u64 {
             let bit = value & Self::Block::one() != Self::Block::zero();
             self.set_bit(start + i, bit);
             value = value >> 1;
@@ -156,9 +167,13 @@ pub trait BitVecMut: BitVec {
     /// # Panics
     ///
     /// Panics if the bit span goes out of bounds.
+    #[inline]
     fn set_bits(&mut self, start: u64, count: usize, value: Self::Block) {
         let limit = start + count as u64;
-        assert!(limit <= self.bit_len(), "BitVecMut::set_bits: out of bounds");
+        assert!(
+            limit <= self.bit_len(),
+            "BitVecMut::set_bits: out of bounds"
+        );
 
         let address = Address::new::<Self::Block>(start);
         let margin = Self::Block::nbits() - address.bit_offset;
@@ -177,8 +192,7 @@ pub trait BitVecMut: BitVec {
 
         let high_bits = value >> margin;
 
-        let new_block1 = old_block1.with_bits(address.bit_offset,
-                                              margin, value);
+        let new_block1 = old_block1.with_bits(address.bit_offset, margin, value);
         let new_block2 = old_block2.with_bits(0, extra, high_bits);
 
         self.set_block(address.block_index, new_block1);
@@ -196,6 +210,7 @@ pub trait BitVecPush: BitVecMut {
 
     /// Pushes `value` 0 or more times until the size of the bit
     /// vector is block-aligned.
+    #[inline]
     fn align_block(&mut self, value: bool) {
         while Self::Block::mod_nbits(self.bit_len()) != 0 {
             self.push_bit(value);
@@ -209,10 +224,11 @@ pub trait BitVecPush: BitVecMut {
     ///
     /// The default implementation pushes the block one bit at a time;
     /// override it with something more efficient.
+    #[inline]
     fn push_block(&mut self, mut value: Self::Block) {
         self.align_block(false);
 
-        for _ in 0 .. Self::Block::nbits() {
+        for _ in 0..Self::Block::nbits() {
             self.push_bit(value & Self::Block::one() != Self::Block::zero());
             value = value >> 1;
         }
@@ -324,26 +340,27 @@ impl BitVec for Vec<bool> {
         self.len() as u64
     }
 
+    #[inline]
     fn get_bit(&self, position: u64) -> bool {
-        self[position.to_usize().expect("Vec<bool>::get_bit: overflow")]
+        self[position as usize]
     }
 }
 
 impl BitVecMut for Vec<bool> {
+    #[inline]
     fn set_bit(&mut self, position: u64, value: bool) {
-        let position = position.to_usize()
-                               .expect("Vec<bool>::set_bit: overflow");
-        self[position] = value;
+        self[position as usize] = value;
     }
 }
 
 impl BitVecPush for Vec<bool> {
+    #[inline]
     fn push_bit(&mut self, value: bool) {
         self.push(value);
     }
 
+    #[inline]
     fn pop_bit(&mut self) -> Option<bool> {
         self.pop()
     }
 }
-

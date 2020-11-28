@@ -2,7 +2,7 @@ use std::fmt;
 
 use super::*;
 use bit_vec::{BitVec, BitVecMut};
-use internal::vector_base::{VectorBase, self};
+use internal::vector_base::{self, VectorBase};
 use space_usage::SpaceUsage;
 use storage::BlockType;
 
@@ -21,15 +21,21 @@ pub struct IntVector<Block: BlockType = usize> {
 impl<Block: BlockType> IntVector<Block> {
     /// Asserts that `element_bits` is valid.
     fn check_element_bits(element_bits: usize) {
-        assert!(element_bits != 0,
-                "IntVector: cannot have zero-size elements");
-        assert!(element_bits <= Block::nbits(),
-                "IntVector: element size cannot exceed block size");
+        assert!(
+            element_bits != 0,
+            "IntVector: cannot have zero-size elements"
+        );
+        assert!(
+            element_bits <= Block::nbits(),
+            "IntVector: element size cannot exceed block size"
+        );
     }
 
     fn check_value_random(element_bits: usize, element_value: Block) {
-        assert!(element_value <= Block::low_mask(element_bits),
-                "IntVector: value to large for element size");
+        assert!(
+            element_value <= Block::low_mask(element_bits),
+            "IntVector: value to large for element size"
+        );
     }
 
     fn check_value(&self, element_value: Block) {
@@ -46,19 +52,18 @@ impl<Block: BlockType> IntVector<Block> {
     }
 
     #[inline]
-    fn compute_address_random(&self, bit_offset: u64, element_bits: usize,
-        element_index: u64) -> u64 {
-        element_index
-        .checked_mul(element_bits as u64)
-        .and_then(|offset| offset.checked_add(bit_offset))
-        .expect("IntVector: index overflow")
+    fn compute_address_random(
+        &self,
+        bit_offset: u64,
+        element_bits: usize,
+        element_index: u64,
+    ) -> u64 {
+        (element_index * element_bits as u64) + bit_offset
     }
 
     #[inline]
     fn compute_address(&self, element_index: u64) -> u64 {
-        element_index
-        .checked_mul(self.element_bits as u64)
-        .expect("IntVector: index overflow")
+        element_index * self.element_bits as u64
     }
 
     /// Creates a new integer vector.
@@ -71,29 +76,38 @@ impl<Block: BlockType> IntVector<Block> {
     /// # Result
     ///
     /// The new, empty integer vector.
+    #[inline]
     pub fn new(element_bits: usize) -> Self {
         Self::create(element_bits, VectorBase::new())
     }
 
     /// Creates a new, empty integer vector, allocating sufficient storage
     /// for `capacity` elements.
+    #[inline]
     pub fn with_capacity(element_bits: usize, capacity: u64) -> Self {
-        Self::create(element_bits,
-                     VectorBase::with_capacity(element_bits, capacity))
+        Self::create(
+            element_bits,
+            VectorBase::with_capacity(element_bits, capacity),
+        )
     }
 
     /// Creates a new, empty integer vector, allocating `block_capacity`
     /// blocks of storage.
-    pub fn block_with_capacity(element_bits: usize, block_capacity: usize)
-                               -> Self {
-        Self::create(element_bits,
-                     VectorBase::block_with_capacity(block_capacity))
+    #[inline]
+    pub fn block_with_capacity(element_bits: usize, block_capacity: usize) -> Self {
+        Self::create(
+            element_bits,
+            VectorBase::block_with_capacity(block_capacity),
+        )
     }
 
     /// Creates a new integer vector containing `len` copies of `value`.
+    #[inline]
     pub fn with_fill(element_bits: usize, len: u64, value: Block) -> Self {
-        Self::create(element_bits,
-                     VectorBase::with_fill(element_bits, len, value))
+        Self::create(
+            element_bits,
+            VectorBase::with_fill(element_bits, len, value),
+        )
     }
 
     /// Creates a new integer vector containing `block_len` copies of the
@@ -101,12 +115,12 @@ impl<Block: BlockType> IntVector<Block> {
     ///
     /// The length of the new vector will be the number of elements of size
     /// `element_bits` that fit in `block_len` blocks.
-    pub fn block_with_fill(element_bits: usize, block_len: usize,
-                           value: Block) -> Self {
-        Self::create(element_bits,
-                     VectorBase::block_with_fill(element_bits,
-                                                 block_len,
-                                                 value))
+    #[inline]
+    pub fn block_with_fill(element_bits: usize, block_len: usize, value: Block) -> Self {
+        Self::create(
+            element_bits,
+            VectorBase::block_with_fill(element_bits, block_len, value),
+        )
     }
 
     /// Returns the element at a given index, also given an arbitrary
@@ -122,13 +136,9 @@ impl<Block: BlockType> IntVector<Block> {
     /// Panics if the referenced bits are out of bounds. Bounds are
     /// considered to the end of the support array, even if that goes
     /// past the last element of the `IntArray`.
-    pub fn get_random(&self,
-                      bit_offset: u64,
-                      element_bits: usize,
-                      element_index: u64) -> Block {
-        let address = self.compute_address_random(bit_offset,
-                                                  element_bits,
-                                                  element_index);
+    #[inline]
+    pub fn get_random(&self, bit_offset: u64, element_bits: usize, element_index: u64) -> Block {
+        let address = self.compute_address_random(bit_offset, element_bits, element_index);
         self.base.get_bits(self.element_bits, address, element_bits)
     }
 
@@ -148,46 +158,57 @@ impl<Block: BlockType> IntVector<Block> {
     ///
     ///   - Debug mode only: Panics if `element_value` is too large to
     ///     fit in the element size. (TODO: What’s the right thing here?)
-    pub fn set_random(&mut self, bit_offset: u64, element_bits: usize,
-                      element_index: u64, element_value: Block) {
-        Self::check_value_random(element_bits, element_value);
+    #[inline]
+    pub fn set_random(
+        &mut self,
+        bit_offset: u64,
+        element_bits: usize,
+        element_index: u64,
+        element_value: Block,
+    ) {
+        assert!(element_value <= Block::low_mask(element_bits));
 
-        let address = self.compute_address_random(bit_offset,
-                                                  element_bits,
-                                                  element_index);
-        self.base.set_bits(self.element_bits, address,
-                           element_bits, element_value);
+        let address = self.compute_address_random(bit_offset, element_bits, element_index);
+        self.base
+            .set_bits(self.element_bits, address, element_bits, element_value);
     }
 
     /// Pushes an element onto the end of the vector, increasing the
     /// length by 1.
+    #[inline]
     pub fn push(&mut self, element_value: Block) {
+        assert!(element_value <= Block::low_mask(self.element_bits));
         self.check_value(element_value);
         self.base.push_bits(self.element_bits, element_value);
     }
 
     /// Removes and returns the last element of the vector, if present.
+    #[inline]
     pub fn pop(&mut self) -> Option<Block> {
         self.base.pop_bits(self.element_bits)
     }
 
     /// The number of elements the vector can hold without reallocating.
+    #[inline]
     pub fn capacity(&self) -> u64 {
         self.base.capacity(self.element_bits)
     }
 
     /// The number of blocks of elements the vector can hold without
     /// reallocating.
+    #[inline]
     pub fn block_capacity(&self) -> usize {
         self.base.block_capacity()
     }
 
     /// Resizes to the given number of elements, filling if necessary.
+    #[inline]
     pub fn resize(&mut self, n_elements: u64, fill: Block) {
         self.base.resize(self.element_bits, n_elements, fill);
     }
 
     /// Resizes to the given number of blocks, filling if necessary.
+    #[inline]
     pub fn block_resize(&mut self, n_blocks: usize, fill: Block) {
         self.base.block_resize(self.element_bits, n_blocks, fill);
     }
@@ -204,6 +225,7 @@ impl<Block: BlockType> IntVector<Block> {
     /// [`IntVector::<Block>::is_okay_size()`](struct.IntVector.html#method.is_okay_size)
     /// are not met. This will happen if the total number of bits
     /// overflows `u64`.
+    #[inline]
     pub fn reserve(&mut self, additional: u64) {
         self.base.reserve(self.element_bits, additional);
     }
@@ -217,6 +239,7 @@ impl<Block: BlockType> IntVector<Block> {
     /// # Panics
     ///
     /// Panics if the number of blocks overflows a `usize`.
+    #[inline]
     pub fn block_reserve(&mut self, additional: usize) {
         self.base.block_reserve(additional);
     }
@@ -233,6 +256,7 @@ impl<Block: BlockType> IntVector<Block> {
     /// [`IntVector::<Block>::is_okay_size()`](struct.IntVector.html#method.is_okay_size)
     /// are not met. This will happen if the total number of bits
     /// overflows `u64`.
+    #[inline]
     pub fn reserve_exact(&mut self, additional: u64) {
         self.base.reserve_exact(self.element_bits, additional);
     }
@@ -249,11 +273,13 @@ impl<Block: BlockType> IntVector<Block> {
     /// # Panics
     ///
     /// Panics if the number of blocks overflows a `usize`.
+    #[inline]
     pub fn block_reserve_exact(&mut self, additional: usize) {
         self.base.block_reserve_exact(additional);
     }
 
     /// Shrinks the capacity to just fit the number of elements.
+    #[inline]
     pub fn shrink_to_fit(&mut self) {
         self.base.shrink_to_fit();
     }
@@ -261,6 +287,7 @@ impl<Block: BlockType> IntVector<Block> {
     /// Shrinks to the given size.
     ///
     /// Does nothing if `n_elements` is greater than the current size.
+    #[inline]
     pub fn truncate(&mut self, n_elements: u64) {
         self.base.truncate(self.element_bits, n_elements);
     }
@@ -268,16 +295,19 @@ impl<Block: BlockType> IntVector<Block> {
     /// Shrinks to the given number of blocks.
     ///
     /// Does nothing if `n_blocks` is greater than the current blocks.
+    #[inline]
     pub fn block_truncate(&mut self, n_blocks: usize) {
         self.base.block_truncate(self.element_bits, n_blocks);
     }
 
     /// Sets the size to 0 while retaining the allocated storage.
+    #[inline]
     pub fn clear(&mut self) {
         self.base.clear();
     }
 
     /// Gets an iterator over the elements of the vector.
+    #[inline]
     pub fn iter(&self) -> Iter<Block> {
         Iter(vector_base::Iter::new(self.element_bits, &self.base))
     }
@@ -298,58 +328,66 @@ impl<Block: BlockType> IntVector<Block> {
 impl<Block: BlockType> IntVec for IntVector<Block> {
     type Block = Block;
 
+    #[inline]
     fn len(&self) -> u64 {
         self.base.len()
     }
 
+    #[inline]
     fn get(&self, element_index: u64) -> Block {
         if self.is_block_sized() {
             return self.base.get_block(element_index as usize);
         }
 
         let address = self.compute_address(element_index);
-        self.base.get_bits(self.element_bits, address, self.element_bits)
+        self.base
+            .get_bits(self.element_bits, address, self.element_bits)
     }
 
+    #[inline]
     fn element_bits(&self) -> usize {
         self.element_bits
     }
 }
 
 impl<Block: BlockType> IntVecMut for IntVector<Block> {
+    #[inline]
     fn set(&mut self, element_index: u64, element_value: Block) {
         if self.is_block_sized() {
-            self.base.set_block(self.element_bits,
-                                element_index as usize,
-                                element_value);
+            self.base
+                .set_block(self.element_bits, element_index as usize, element_value);
             return;
         }
 
-        self.check_value(element_value);
+        // self.check_value(element_value);
 
         let address = self.compute_address(element_index);
-        self.base.set_bits(self.element_bits, address,
-                           self.element_bits, element_value);
+        self.base
+            .set_bits(self.element_bits, address, self.element_bits, element_value);
     }
 }
 
 impl<Block: BlockType> BitVec for IntVector<Block> {
     type Block = Block;
 
+    #[inline]
     fn block_len(&self) -> usize {
         self.base.block_len()
     }
 
+    #[inline]
     fn bit_len(&self) -> u64 {
         self.element_bits as u64 * self.base.len()
     }
 
+    #[inline]
     fn get_block(&self, position: usize) -> Block {
         self.base.get_block(position)
     }
 }
 
 impl<Block: BlockType> BitVecMut for IntVector<Block> {
+    #[inline]
     fn set_block(&mut self, position: usize, value: Block) {
         self.base.set_block(self.element_bits, position, value);
     }
@@ -357,28 +395,32 @@ impl<Block: BlockType> BitVecMut for IntVector<Block> {
 
 /// An iterator over the elements of an [`IntVector`](struct.IntVector.html).
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub struct Iter<'a, Block: BlockType + 'a = usize>
-    (vector_base::Iter<'a, Block>);
+pub struct Iter<'a, Block: BlockType + 'a = usize>(vector_base::Iter<'a, Block>);
 
 impl<'a, Block: BlockType> Iterator for Iter<'a, Block> {
     type Item = Block;
 
+    #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         self.0.next()
     }
 
+    #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
         self.0.size_hint()
     }
 
+    #[inline]
     fn count(self) -> usize {
         self.0.count()
     }
 
+    #[inline]
     fn last(self) -> Option<Self::Item> {
         self.0.last()
     }
 
+    #[inline]
     fn nth(&mut self, n: usize) -> Option<Self::Item> {
         self.0.nth(n)
     }
@@ -386,12 +428,14 @@ impl<'a, Block: BlockType> Iterator for Iter<'a, Block> {
 
 #[cfg(target_pointer_width = "64")]
 impl<'a, Block: BlockType> ExactSizeIterator for Iter<'a, Block> {
+    #[inline]
     fn len(&self) -> usize {
         self.0.len()
     }
 }
 
 impl<'a, Block: BlockType> DoubleEndedIterator for Iter<'a, Block> {
+    #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
         self.0.next_back()
     }
@@ -401,20 +445,25 @@ impl<'a, Block: BlockType + 'a> IntoIterator for &'a IntVector<Block> {
     type Item = Block;
     type IntoIter = Iter<'a, Block>;
 
+    #[inline]
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
     }
 }
 
 impl<Block> fmt::Debug for IntVector<Block>
-        where Block: BlockType + fmt::Debug {
-
+where
+    Block: BlockType + fmt::Debug,
+{
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        try!(write!(formatter, "IntVector {{ element_bits: {}, elements: {{ ",
-                    self.element_bits()));
+        write!(
+            formatter,
+            "IntVector {{ element_bits: {}, elements: {{ ",
+            self.element_bits()
+        )?;
 
         for element in self {
-            try!(write!(formatter, "{:?}, ", element));
+            write!(formatter, "{:?}, ", element)?;
         }
 
         write!(formatter, "}} }}")
@@ -423,7 +472,9 @@ impl<Block> fmt::Debug for IntVector<Block>
 
 impl<A: BlockType> SpaceUsage for IntVector<A> {
     #[inline]
-    fn is_stack_only() -> bool { false }
+    fn is_stack_only() -> bool {
+        false
+    }
 
     #[inline]
     fn heap_bytes(&self) -> usize {
@@ -433,8 +484,8 @@ impl<A: BlockType> SpaceUsage for IntVector<A> {
 
 #[cfg(test)]
 mod test {
-    use int_vec::{IntVector, IntVec, IntVecMut};
     use bit_vec::*;
+    use int_vec::{IntVec, IntVecMut, IntVector};
 
     #[test]
     fn create_empty() {
@@ -573,8 +624,10 @@ mod test {
         v.push(3);
         v.push(5);
 
-        assert_eq!("IntVector { element_bits: 13, elements: { 1, 1, 2, 3, 5, } }".to_owned(),
-                   format!("{:?}", v));
+        assert_eq!(
+            "IntVector { element_bits: 13, elements: { 1, 1, 2, 3, 5, } }".to_owned(),
+            format!("{:?}", v)
+        );
     }
 
     #[test]
@@ -592,17 +645,17 @@ mod test {
         v.push(0);
         v.push(1);
 
-        assert!(  v.get_bit(0));
-        assert!(! v.get_bit(1));
-        assert!(! v.get_bit(2));
-        assert!(  v.get_bit(3));
+        assert!(v.get_bit(0));
+        assert!(!v.get_bit(1));
+        assert!(!v.get_bit(2));
+        assert!(v.get_bit(3));
 
         v.set_bit(1, true);
 
-        assert!(  v.get_bit(0));
-        assert!(  v.get_bit(1));
-        assert!(! v.get_bit(2));
-        assert!(  v.get_bit(3));
+        assert!(v.get_bit(0));
+        assert!(v.get_bit(1));
+        assert!(!v.get_bit(2));
+        assert!(v.get_bit(3));
     }
 
     #[test]
@@ -612,15 +665,15 @@ mod test {
 
         v.push(5);
         u.push(5);
-        assert!( v == u );
+        assert!(v == u);
 
         v.push(6);
         u.push(7);
-        assert!( v != u );
+        assert!(v != u);
 
         v.pop();
         u.pop();
-        assert!( v == u );
+        assert!(v == u);
     }
 
     #[test]

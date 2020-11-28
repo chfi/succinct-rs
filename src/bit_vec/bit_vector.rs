@@ -3,10 +3,10 @@ use std::fmt;
 #[cfg(target_pointer_width = "32")]
 use num_traits::ToPrimitive;
 
-use internal::vector_base::{VectorBase, self};
+use super::traits::*;
+use internal::vector_base::{self, VectorBase};
 use space_usage::SpaceUsage;
 use storage::BlockType;
-use super::traits::*;
 
 /// Uncompressed vector of bits.
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
@@ -26,12 +26,14 @@ impl<Block: BlockType> BitVector<Block> {
     /// Panics if `capacity` is too large. In particular the number of
     /// blocks required by the capacity (`capacity / Block::nbits()`)
     /// must fit in a `usize`.
+    #[inline]
     pub fn with_capacity(capacity: u64) -> Self {
         BitVector(VectorBase::with_capacity(1, capacity))
     }
 
     /// Creates a new, empty bit vector with space allocated for `capacity`
     /// blocks.
+    #[inline]
     pub fn block_with_capacity(capacity: usize) -> Self {
         BitVector(VectorBase::block_with_capacity(capacity))
     }
@@ -43,26 +45,29 @@ impl<Block: BlockType> BitVector<Block> {
     /// Panics if `len` is too large. In particular the number of
     /// blocks required by the capacity (`len / Block::nbits()`)
     /// must fit in a `usize`.
+    #[inline]
     pub fn with_fill(len: u64, value: bool) -> Self {
-        let block_size = Block::checked_ceil_div_nbits(len)
-                             .expect("BitVector::with_fill: overflow");
-        let block_value = if value {!Block::zero()} else {Block::zero()};
+        let block_size = Block::ceil_div_nbits(len);
+        let block_value = if value { !Block::zero() } else { Block::zero() };
         let mut result = Self::block_with_fill(block_size, block_value);
         result.0.truncate(1, len);
         result
     }
 
     /// Creates a new bit vector of `block_len` blocks initialized to `value`.
+    #[inline]
     pub fn block_with_fill(block_len: usize, value: Block) -> Self {
         BitVector(VectorBase::block_with_fill(1, block_len, value))
     }
 
     /// How many bits the bit vector can hold without reallocating.
+    #[inline]
     pub fn capacity(&self) -> u64 {
         self.0.capacity(1)
     }
 
     /// How many blocks the bit vector can hold without reallocating.
+    #[inline]
     pub fn block_capacity(&self) -> usize {
         self.0.block_capacity()
     }
@@ -75,16 +80,16 @@ impl<Block: BlockType> BitVector<Block> {
     /// Panics if `new_len` is too large. In particular the number of
     /// blocks required by the capacity (`new_len / Block::nbits()`)
     /// must fit in a `usize`.
+    #[inline]
     pub fn resize(&mut self, new_len: u64, value: bool) {
-        let new_block_len = Block::checked_ceil_div_nbits(new_len)
-                                .expect("BitVector::resize: overflow");
+        let new_block_len = Block::ceil_div_nbits(new_len);
 
         if new_len < self.bit_len() || !value {
             self.block_resize(new_block_len, Block::zero());
         } else {
             let trailing = Block::last_block_bits(self.bit_len());
             let remaining = Block::nbits() - trailing;
-            for _ in 0 .. remaining {
+            for _ in 0..remaining {
                 self.0.push_bit(true);
             }
             self.block_resize(new_block_len, !Block::zero());
@@ -95,6 +100,7 @@ impl<Block: BlockType> BitVector<Block> {
 
     /// Resizes the bit vector to the given number of blocks,
     /// filling if necessary.
+    #[inline]
     pub fn block_resize(&mut self, new_len: usize, value: Block) {
         self.0.block_resize(1, new_len, value);
     }
@@ -108,6 +114,7 @@ impl<Block: BlockType> BitVector<Block> {
     /// # Panics
     ///
     /// Panics if the number of blocks overflows a `usize`.
+    #[inline]
     pub fn reserve(&mut self, additional: u64) {
         self.0.reserve(1, additional);
     }
@@ -121,6 +128,7 @@ impl<Block: BlockType> BitVector<Block> {
     /// # Panics
     ///
     /// Panics if the number of blocks overflows a `usize`.
+    #[inline]
     pub fn block_reserve(&mut self, additional: usize) {
         self.0.block_reserve(additional);
     }
@@ -134,6 +142,7 @@ impl<Block: BlockType> BitVector<Block> {
     /// # Panics
     ///
     /// Panics if the number of blocks overflows a `usize`.
+    #[inline]
     pub fn reserve_exact(&mut self, additional: u64) {
         self.0.reserve_exact(1, additional);
     }
@@ -147,11 +156,13 @@ impl<Block: BlockType> BitVector<Block> {
     /// # Panics
     ///
     /// Panics if the number of blocks overflows a `usize`.
+    #[inline]
     pub fn block_reserve_exact(&mut self, additional: usize) {
         self.0.block_reserve_exact(additional);
     }
 
     /// Shrinks the capacity to just fit the number of elements.
+    #[inline]
     pub fn shrink_to_fit(&mut self) {
         self.0.shrink_to_fit()
     }
@@ -159,6 +170,7 @@ impl<Block: BlockType> BitVector<Block> {
     /// Shrinks to the given size.
     ///
     /// Does nothing if `len` is greater than the current size.
+    #[inline]
     pub fn truncate(&mut self, len: u64) {
         self.0.truncate(1, len);
     }
@@ -166,6 +178,7 @@ impl<Block: BlockType> BitVector<Block> {
     /// Shrinks to the given size in blocks.
     ///
     /// Does nothing if `block_len` is greater than the current size in blocks.
+    #[inline]
     pub fn block_truncate(&mut self, block_len: usize) {
         self.0.block_truncate(1, block_len);
     }
@@ -189,6 +202,7 @@ impl<Block: BlockType> BitVec for BitVector<Block> {
         self.0.len()
     }
 
+    #[inline]
     fn get_bit(&self, index: u64) -> bool {
         self.0.get_bit(index)
     }
@@ -200,6 +214,7 @@ impl<Block: BlockType> BitVec for BitVector<Block> {
 }
 
 impl<Block: BlockType> BitVecMut for BitVector<Block> {
+    #[inline]
     fn set_bit(&mut self, index: u64, value: bool) {
         self.0.set_bit(index, value);
     }
@@ -211,14 +226,17 @@ impl<Block: BlockType> BitVecMut for BitVector<Block> {
 }
 
 impl<Block: BlockType> BitVecPush for BitVector<Block> {
+    #[inline]
     fn push_bit(&mut self, value: bool) {
         self.0.push_bit(value);
     }
 
+    #[inline]
     fn pop_bit(&mut self) -> Option<bool> {
         self.0.pop_bit()
     }
 
+    #[inline]
     fn push_block(&mut self, value: Block) {
         self.0.push_block(1, value);
     }
@@ -227,8 +245,8 @@ impl<Block: BlockType> BitVecPush for BitVector<Block> {
 impl<Block: BlockType> fmt::Binary for BitVector<Block> {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         for bit in self {
-            let bit = if bit {"1"} else {"0"};
-            try!(formatter.write_str(bit));
+            let bit = if bit { "1" } else { "0" };
+            formatter.write_str(bit)?;
         }
 
         Ok(())
@@ -236,8 +254,12 @@ impl<Block: BlockType> fmt::Binary for BitVector<Block> {
 }
 
 impl<Block: BlockType> SpaceUsage for BitVector<Block> {
-    fn is_stack_only() -> bool { false }
+    #[inline]
+    fn is_stack_only() -> bool {
+        false
+    }
 
+    #[inline]
     fn heap_bytes(&self) -> usize {
         self.0.heap_bytes()
     }
@@ -251,28 +273,32 @@ impl<Block: BlockType> Default for BitVector<Block> {
 
 /// Iterator over `BitVector`.
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub struct Iter<'a, Block: BlockType + 'a = usize>
-    (vector_base::Iter<'a, Block>);
+pub struct Iter<'a, Block: BlockType + 'a = usize>(vector_base::Iter<'a, Block>);
 
 impl<'a, Block: BlockType> Iterator for Iter<'a, Block> {
     type Item = bool;
 
+    #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         self.0.next().map(|bit| bit != Block::zero())
     }
 
+    #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
         self.0.size_hint()
     }
 
+    #[inline]
     fn count(self) -> usize {
         self.0.count()
     }
 
+    #[inline]
     fn last(self) -> Option<Self::Item> {
         self.0.last().map(|bit| bit != Block::zero())
     }
 
+    #[inline]
     fn nth(&mut self, n: usize) -> Option<Self::Item> {
         self.0.nth(n).map(|bit| bit != Block::zero())
     }
@@ -280,12 +306,14 @@ impl<'a, Block: BlockType> Iterator for Iter<'a, Block> {
 
 #[cfg(target_pointer_width = "64")]
 impl<'a, Block: BlockType> ExactSizeIterator for Iter<'a, Block> {
+    #[inline]
     fn len(&self) -> usize {
         self.0.len()
     }
 }
 
 impl<'a, Block: BlockType> DoubleEndedIterator for Iter<'a, Block> {
+    #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
         self.0.next_back().map(|bit| bit != Block::zero())
     }
@@ -307,7 +335,7 @@ mod test {
     macro_rules! assert_bv {
         ($expected:expr, $actual:expr) => {
             assert_eq!($expected, format!("{:b}", $actual))
-        }
+        };
     }
 
     #[test]
@@ -397,11 +425,11 @@ mod test {
     #[test]
     fn push_bits_get_block() {
         let mut bit_vector: BitVector = BitVector::new();
-        bit_vector.push_bit(true);  // 1
-        bit_vector.push_bit(true);  // 2
+        bit_vector.push_bit(true); // 1
+        bit_vector.push_bit(true); // 2
         bit_vector.push_bit(false); // (4)
         bit_vector.push_bit(false); // (8)
-        bit_vector.push_bit(true);  // 16
+        bit_vector.push_bit(true); // 16
 
         assert_eq!(19, bit_vector.get_block(0));
     }

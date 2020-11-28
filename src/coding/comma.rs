@@ -19,10 +19,10 @@ impl UniversalCode for Comma {
         }
 
         while let Some(digit) = stack.pop() {
-            try!(sink.write_int(self.0 as usize, digit));
+            sink.write_int(self.0 as usize, digit)?;
         }
 
-        try!(sink.write_int(self.0 as usize, base));
+        sink.write_int(self.0 as usize, base)?;
 
         Ok(())
     }
@@ -33,8 +33,10 @@ impl UniversalCode for Comma {
         let mut consumed = false;
 
         loop {
-            if let Some(digit) = try!(source.read_int::<u64>(self.0 as usize)) {
-                if digit == base { return Ok(Some(result)) }
+            if let Some(digit) = source.read_int::<u64>(self.0 as usize)? {
+                if digit == base {
+                    return Ok(Some(result));
+                }
 
                 consumed = true;
                 result = result * base + digit;
@@ -49,10 +51,10 @@ impl UniversalCode for Comma {
 
 #[cfg(test)]
 mod test {
-    use std::collections::VecDeque;
-    use quickcheck::quickcheck;
-    use coding::*;
     use coding::properties;
+    use coding::*;
+    use quickcheck::quickcheck;
+    use std::collections::VecDeque;
 
     #[test]
     fn enc234() {

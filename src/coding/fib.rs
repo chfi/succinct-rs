@@ -14,10 +14,7 @@ struct Fib {
 
 impl Fib {
     fn new() -> Self {
-        Fib {
-            i_1: 1,
-            i: 1,
-        }
+        Fib { i_1: 1, i: 1 }
     }
 
     fn next(&mut self) -> Result<()> {
@@ -44,7 +41,7 @@ impl UniversalCode for Fibonacci {
         // Having to compute fib.i when we really just need fib.i_1
         // means that this gives up on smaller numbers than it needs to.
         while fib.i <= value {
-            try!(fib.next());
+            fib.next()?;
         }
 
         // Now fib.i_1 is the largest Fibonacci number <= value
@@ -62,18 +59,18 @@ impl UniversalCode for Fibonacci {
         }
 
         while let Some(bit) = stack.pop() {
-            try!(sink.write_bit(bit));
+            sink.write_bit(bit)?;
         }
 
         Ok(())
     }
 
     fn decode<R: BitRead>(&self, source: &mut R) -> Result<Option<u64>> {
-        let mut result  = 0;
+        let mut result = 0;
         let mut fib = Fib::new();
         let mut previous = false;
 
-        while let Some(bit) = try!(source.read_bit()) {
+        while let Some(bit) = source.read_bit()? {
             if bit && previous {
                 return Ok(Some(result));
             }
@@ -82,7 +79,7 @@ impl UniversalCode for Fibonacci {
                 result += fib.i;
             }
 
-            try!(fib.next());
+            fib.next()?;
             previous = bit;
         }
 
@@ -96,10 +93,10 @@ impl UniversalCode for Fibonacci {
 
 #[cfg(test)]
 mod test {
-    use std::collections::VecDeque;
-    use quickcheck::quickcheck;
-    use coding::*;
     use coding::properties;
+    use coding::*;
+    use quickcheck::quickcheck;
+    use std::collections::VecDeque;
 
     #[test]
     fn enc234() {
